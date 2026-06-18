@@ -125,10 +125,12 @@ export default function ZenSandbox({ onAction, theme }) {
     const canvas = canvasRef.current;
     if (!canvas) return { x: 0, y: 0 };
     
-    // Support mouse and touch events
     const rect = canvas.getBoundingClientRect();
-    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    
+    // Check if it is a touch event or mouse event
+    const isTouch = e.touches && e.touches.length > 0;
+    const clientX = isTouch ? e.touches[0].clientX : e.clientX;
+    const clientY = isTouch ? e.touches[0].clientY : e.clientY;
     
     return {
       x: clientX - rect.left,
@@ -136,8 +138,8 @@ export default function ZenSandbox({ onAction, theme }) {
     };
   };
 
-  const handleStart = (e) => {
-    e.preventDefault();
+  // Mouse event handlers (React standard)
+  const handleMouseDown = (e) => {
     const pos = getCoordinates(e);
     lastPosRef.current = pos;
     setIsDrawing(true);
@@ -149,7 +151,7 @@ export default function ZenSandbox({ onAction, theme }) {
     }
   };
 
-  const handleMove = (e) => {
+  const handleMouseMove = (e) => {
     if (!isDrawing || activeTool === 'ripple') return;
     
     const canvas = canvasRef.current;
@@ -183,9 +185,93 @@ export default function ZenSandbox({ onAction, theme }) {
     lastPosRef.current = pos;
   };
 
-  const handleEnd = () => {
+  const handleMouseUp = () => {
     setIsDrawing(false);
   };
+
+  // Native touch event listeners to override passive-mode scrolling
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    let isTouchDrawing = false;
+
+    const onTouchStart = (e) => {
+      // Prevent browser viewport scrolling when touching the canvas
+      if (e.cancelable) {
+        e.preventDefault();
+      }
+
+      isTouchDrawing = true;
+      setIsDrawing(true);
+      const pos = getCoordinates(e);
+      lastPosRef.current = pos;
+
+      if (activeTool === 'ripple') {
+        const canvas = canvasRef.current;
+        if (canvas) {
+          const ctx = canvas.getContext('2d');
+          drawRipple(ctx, pos.x, pos.y);
+        }
+      }
+    };
+
+    const onTouchMove = (e) => {
+      // Lock viewport scrolling
+      if (e.cancelable) {
+        e.preventDefault();
+      }
+
+      if (!isTouchDrawing || activeTool === 'ripple') return;
+
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      const pos = getCoordinates(e);
+      const last = lastPosRef.current;
+
+      // Draw pattern based on tool
+      if (activeTool === 'rake-1') {
+        drawGroove(ctx, last.x, last.y, pos.x, pos.y, 0, 6);
+      } else if (activeTool === 'rake-3') {
+        drawGroove(ctx, last.x, last.y, pos.x, pos.y, -8, 4);
+        drawGroove(ctx, last.x, last.y, pos.x, pos.y, 0, 4);
+        drawGroove(ctx, last.x, last.y, pos.x, pos.y, 8, 4);
+      } else if (activeTool === 'rake-5') {
+        drawGroove(ctx, last.x, last.y, pos.x, pos.y, -16, 3);
+        drawGroove(ctx, last.x, last.y, pos.x, pos.y, -8, 3);
+        drawGroove(ctx, last.x, last.y, pos.x, pos.y, 0, 3);
+        drawGroove(ctx, last.x, last.y, pos.x, pos.y, 8, 3);
+        drawGroove(ctx, last.x, last.y, pos.x, pos.y, 16, 3);
+      }
+
+      pointsDrawnRef.current += 1;
+      if (pointsDrawnRef.current >= 40) {
+        onAction('rake', 1);
+        pointsDrawnRef.current = 0;
+      }
+
+      lastPosRef.current = pos;
+    };
+
+    const onTouchEnd = (e) => {
+      isTouchDrawing = false;
+      setIsDrawing(false);
+    };
+
+    // Attach listeners with passive: false to allow preventDefault
+    container.addEventListener('touchstart', onTouchStart, { passive: false });
+    container.addEventListener('touchmove', onTouchMove, { passive: false });
+    container.addEventListener('touchend', onTouchEnd, { passive: false });
+    container.addEventListener('touchcancel', onTouchEnd, { passive: false });
+
+    return () => {
+      container.removeEventListener('touchstart', onTouchStart);
+      container.removeEventListener('touchmove', onTouchMove);
+      container.removeEventListener('touchend', onTouchEnd);
+      container.removeEventListener('touchcancel', onTouchEnd);
+    };
+  }, [activeTool, isDrawing, theme]);
 
   return (
     <div className="glass-panel sandbox-card">
@@ -244,13 +330,10 @@ export default function ZenSandbox({ onAction, theme }) {
       <div 
         className="canvas-container"
         ref={containerRef}
-        onMouseDown={handleStart}
-        onMouseMove={handleMove}
-        onMouseUp={handleEnd}
-        onMouseLeave={handleEnd}
-        onTouchStart={handleStart}
-        onTouchMove={handleMove}
-        onTouchEnd={handleEnd}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
       >
         <canvas ref={canvasRef} />
         <div className={`sweep-overlay ${isSweeping ? 'animate' : ''}`} />
