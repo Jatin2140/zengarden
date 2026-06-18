@@ -115,28 +115,28 @@ function App() {
           onClick={() => setActiveTab('sandbox')}
         >
           <Compass size={18} />
-          Zen Sandbox
+          <span>Zen Sandbox</span>
         </button>
         <button 
           className={`tab-btn ${activeTab === 'sounds' ? 'active' : ''}`}
           onClick={() => setActiveTab('sounds')}
         >
           <Music size={18} />
-          Sound Sanctuary
+          <span>Sound Sanctuary</span>
         </button>
         <button 
           className={`tab-btn ${activeTab === 'breathing' ? 'active' : ''}`}
           onClick={() => setActiveTab('breathing')}
         >
           <Wind size={18} />
-          Breath Sync
+          <span>Breath Sync</span>
         </button>
         <button 
           className={`tab-btn ${activeTab === 'gratitude' ? 'active' : ''}`}
           onClick={() => setActiveTab('gratitude')}
         >
           <Heart size={18} />
-          Gratitude Jar
+          <span>Gratitude Jar</span>
         </button>
       </nav>
 
